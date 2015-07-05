@@ -7,6 +7,10 @@
 using namespace std;
 using namespace cv;
 
+bool calibration_done = false;
+Rect screen;
+Mat screen_image;
+
 
 void scale(const Mat &src,Mat &dst) {
     cv::resize(src, dst, cv::Size(kFastEyeWidth,(((float)kFastEyeWidth)/src.cols) * src.rows));
@@ -121,10 +125,13 @@ Point find_centers(Mat face_image, Rect eye_region, string window_name) {
 }
 
 /*
+ * returns an array of points of the pupils
+ * [left pupil, right pupil]
+ *
  * color_image: image of the whole frame
  * face: dimensions of face in color_image
  */
-void find_eyes(Mat color_image, Rect face) {
+void find_eyes(Mat color_image, Rect face, Point &left_pupil_dst, Point &right_pupil_dst) {
     // image of face
     Mat face_image = color_image(face);
 
@@ -142,7 +149,7 @@ void find_eyes(Mat color_image, Rect face) {
     rectangle(face_image, left_eye_region, Scalar(0, 0, 255));
     rectangle(face_image, right_eye_region, Scalar(0, 0, 255));
 
-    // get points of pupils
+    // get points of pupils within eye region
     Point left_pupil = find_centers(face_image, left_eye_region, "left eye");
     Point right_pupil = find_centers(face_image, right_eye_region, "right eye");
 
@@ -152,12 +159,19 @@ void find_eyes(Mat color_image, Rect face) {
     left_pupil.x += left_eye_region.x;
     left_pupil.y += left_eye_region.y;
 
+    Point center;
+    center.x = (right_pupil.x - left_pupil.x)/2 + left_pupil.x;
+    center.y = (right_pupil.y + left_pupil.y)/2;
+
     // draw pupils
     circle(face_image, right_pupil, 3, Scalar(0, 255, 0));
     circle(face_image, left_pupil, 3, Scalar(0, 255, 0));
+    circle(face_image, center, 3, Scalar(255, 0, 0));
+
+    left_pupil_dst = left_pupil;
+    right_pupil_dst = right_pupil;
 
     imshow("window", color_image);
-
 }
 
 
@@ -165,6 +179,7 @@ int main() {
 
     CascadeClassifier face_cascade;
     face_cascade.load("haar_data/haarcascade_frontalface_alt.xml");
+    screen_image = imread("screen_test.png");
 
     VideoCapture cap(0);
     if (!cap.isOpened()) {
@@ -174,23 +189,48 @@ int main() {
     namedWindow("window");
     Mat frame;
     cap >> frame;
+    int count = 0;
     while (1) {
         Mat gray_image;
         vector<Rect> faces;
         cvtColor(frame, gray_image, COLOR_BGRA2GRAY);
         face_cascade.detectMultiScale(gray_image, faces, 1.1, 2, 0|CV_HAAR_SCALE_IMAGE|CV_HAAR_FIND_BIGGEST_OBJECT);
 
-//        for (int x = 0; x < faces.size(); x++) {
-//            rectangle(frame, faces[0], 1234);
-//        }
-
+        Point left_pupil, right_pupil;
         if (faces.size() > 0) {
-            find_eyes(frame, faces[0]);
+            find_eyes(frame, faces[0], left_pupil, right_pupil);
         }
 
-        if (waitKey(5) == 113) {
+        // if 'q' is tapped, exit
+        int wait_key = waitKey(8);
+        if (wait_key == 113) {
             break;
         }
+
+        // if space is tap, take calibration
+        else if(wait_key == 32) {
+            // left screen
+            if (count == 0) {
+                screen.x = (right_pupil.x - left_pupil.x)/2 + left_pupil.x;
+            }
+            // top screen
+            else if (count == 1) {
+                screen.y = (right_pupil.y + left_pupil.y)/2;
+            }
+            // right screen
+            else if (count == 2) {
+                assert (((right_pupil.x - left_pupil.x)/2 + left_pupil.x) > screen.x);
+                screen.width = ((right_pupil.x - left_pupil.x)/2 + left_pupil.x) - screen.x;
+            }
+            // bottom screen
+            else if (count == 3) {
+                assert (((right_pupil.y + left_pupil.y)/2) > screen.y);
+                screen.height = ((right_pupil.y + left_pupil.y)/2) - screen.y;
+                calibration_done = true;
+            }
+            count++;
+        }
+
         cap >> frame;
     }
 
