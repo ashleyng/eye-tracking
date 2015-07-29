@@ -199,6 +199,8 @@ int main() {
         Point left_pupil, right_pupil;
         if (faces.size() > 0) {
             find_eyes(frame, faces[0], left_pupil, right_pupil);
+            cout << "Rectangle:" << faces[0] << "    " << "Left pupil:" << left_pupil << "   " << "Right pupil:" << right_pupil;
+            cout << "\n";
         }
 
         // if 'q' is tapped, exit
