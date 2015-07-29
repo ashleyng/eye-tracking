@@ -131,7 +131,7 @@ Point find_centers(Mat face_image, Rect eye_region, string window_name) {
  * color_image: image of the whole frame
  * face: dimensions of face in color_image
  */
-void find_eyes(Mat color_image, Rect face, Point &left_pupil_dst, Point &right_pupil_dst, CvFont font) {
+void find_eyes(Mat color_image, Rect face, Point &left_pupil_dst, Point &right_pupil_dst, Rect &left_eye_region_dst, Rect &right_eye_region_dst) {
     // image of face
     Mat face_image = color_image(face);
 
@@ -145,10 +145,6 @@ void find_eyes(Mat color_image, Rect face, Point &left_pupil_dst, Point &right_p
     Rect left_eye_region(eye_side, eye_top, eye_width, eye_height);
     Rect right_eye_region(right_eye_x, eye_top, eye_width, eye_height);
 
-    // draw eye regions
-    rectangle(face_image, left_eye_region, Scalar(0, 0, 255));
-    rectangle(face_image, right_eye_region, Scalar(0, 0, 255));
-
     // get points of pupils within eye region
     Point left_pupil = find_centers(face_image, left_eye_region, "left eye");
     Point right_pupil = find_centers(face_image, right_eye_region, "right eye");
@@ -159,6 +155,21 @@ void find_eyes(Mat color_image, Rect face, Point &left_pupil_dst, Point &right_p
     left_pupil.x += left_eye_region.x;
     left_pupil.y += left_eye_region.y;
 
+
+    left_pupil_dst = left_pupil;
+    right_pupil_dst = right_pupil;
+    left_eye_region_dst = left_eye_region;
+    right_eye_region_dst = right_eye_region;
+}
+
+void display_eyes(Mat color_image, Rect face, Point left_pupil, Point right_pupil, Rect left_eye_region, Rect right_eye_region) {
+    Mat face_image = color_image(face);
+
+    // draw eye regions
+    rectangle(face_image, left_eye_region, Scalar(0, 0, 255));
+    rectangle(face_image, right_eye_region, Scalar(0, 0, 255));
+
+    //find eye center
     Point center;
     center.x = (right_pupil.x - left_pupil.x)/2 + left_pupil.x;
     center.y = (right_pupil.y + left_pupil.y)/2;
@@ -168,11 +179,10 @@ void find_eyes(Mat color_image, Rect face, Point &left_pupil_dst, Point &right_p
     circle(face_image, left_pupil, 3, Scalar(0, 255, 0));
     circle(face_image, center, 3, Scalar(255, 0, 0));
 
-    left_pupil_dst = left_pupil;
-    right_pupil_dst = right_pupil;
-
     //add data
     putText (color_image, "test", cvPoint(20,700), FONT_HERSHEY_SIMPLEX, double(1), Scalar(0,0,0));
+
+    //display
     imshow("window", color_image);
 }
 
@@ -205,8 +215,10 @@ int main() {
         face_cascade.detectMultiScale(gray_image, faces, 1.1, 2, 0|CV_HAAR_SCALE_IMAGE|CV_HAAR_FIND_BIGGEST_OBJECT);
 
         Point left_pupil, right_pupil;
+        Rect left_eye, right_eye;
         if (faces.size() > 0) {
-            find_eyes(frame, faces[0], left_pupil, right_pupil, font);
+            find_eyes(frame, faces[0], left_pupil, right_pupil, left_eye, right_eye);
+            display_eyes(frame, faces[0], left_pupil, right_pupil, left_eye, right_eye);
             cout << "Center:" << "(" << faces[0].width/2 << "," << faces[0].height/2 << ")" << "    " << "Rectangle:" << faces[0] << "    " << "Left pupil:" << left_pupil << "   " << "Right pupil:" << right_pupil;
             cout << "\n";
         }
