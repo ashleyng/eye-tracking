@@ -207,6 +207,8 @@ int main() {
         Point left_pupil, right_pupil;
         if (faces.size() > 0) {
             find_eyes(frame, faces[0], left_pupil, right_pupil, font);
+            cout << "Center:" << "(" << faces[0].width/2 << "," << faces[0].height/2 << ")" << "    " << "Rectangle:" << faces[0] << "    " << "Left pupil:" << left_pupil << "   " << "Right pupil:" << right_pupil;
+            cout << "\n";
         }
 
         // if 'q' is tapped, exit
