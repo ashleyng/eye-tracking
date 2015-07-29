@@ -9,7 +9,12 @@ using namespace cv;
 
 bool calibration_done = false;
 Rect screen;
-Mat screen_image;
+typedef struct {
+    Point CenterPointOfEyes=Point(-1,-1);
+    Point NatPupilOffsetFromEyeCenter=Point(-1,-1);
+} EyeSettingsSt;
+
+EyeSettingsSt EyeSettings;
 
 
 void scale(const Mat &src,Mat &dst) {
@@ -131,7 +136,7 @@ Point find_centers(Mat face_image, Rect eye_region, string window_name) {
  * color_image: image of the whole frame
  * face: dimensions of face in color_image
  */
-void find_eyes(Mat color_image, Rect face, Point &left_pupil_dst, Point &right_pupil_dst) {
+void find_eyes(Mat color_image, Rect face, Point &left_pupil_dst, Point &right_pupil_dst, Rect &left_eye_region_dst, Rect &right_eye_region_dst) {
     // image of face
     Mat face_image = color_image(face);
 
@@ -145,10 +150,6 @@ void find_eyes(Mat color_image, Rect face, Point &left_pupil_dst, Point &right_p
     Rect left_eye_region(eye_side, eye_top, eye_width, eye_height);
     Rect right_eye_region(right_eye_x, eye_top, eye_width, eye_height);
 
-    // draw eye regions
-    rectangle(face_image, left_eye_region, Scalar(0, 0, 255));
-    rectangle(face_image, right_eye_region, Scalar(0, 0, 255));
-
     // get points of pupils within eye region
     Point left_pupil = find_centers(face_image, left_eye_region, "left eye");
     Point right_pupil = find_centers(face_image, right_eye_region, "right eye");
@@ -159,6 +160,21 @@ void find_eyes(Mat color_image, Rect face, Point &left_pupil_dst, Point &right_p
     left_pupil.x += left_eye_region.x;
     left_pupil.y += left_eye_region.y;
 
+
+    left_pupil_dst = left_pupil;
+    right_pupil_dst = right_pupil;
+    left_eye_region_dst = left_eye_region;
+    right_eye_region_dst = right_eye_region;
+}
+
+void display_eyes(Mat color_image, Rect face, Point left_pupil, Point right_pupil, Rect left_eye_region, Rect right_eye_region) {
+    Mat face_image = color_image(face);
+
+    // draw eye regions
+    rectangle(face_image, left_eye_region, Scalar(0, 0, 255));
+    rectangle(face_image, right_eye_region, Scalar(0, 0, 255));
+
+    //find eye center
     Point center;
     center.x = (right_pupil.x - left_pupil.x)/2 + left_pupil.x;
     center.y = (right_pupil.y + left_pupil.y)/2;
@@ -168,18 +184,30 @@ void find_eyes(Mat color_image, Rect face, Point &left_pupil_dst, Point &right_p
     circle(face_image, left_pupil, 3, Scalar(0, 255, 0));
     circle(face_image, center, 3, Scalar(255, 0, 0));
 
-    left_pupil_dst = left_pupil;
-    right_pupil_dst = right_pupil;
+    //add data
+    putText (color_image, "test", cvPoint(20,700), FONT_HERSHEY_SIMPLEX, double(1), Scalar(0,0,0));
 
-    imshow("window", color_image);
+    //display
+    //imshow("window", color_image);
 }
 
+Point TransformPupilPointToScreenPoint(Point pupil){
+    Point screen;
+    screen.x = pupil.x*50;
+    screen.y=pupil.y*50;
+    return screen;
+}
 
 int main() {
+    //define font
+    CvFont font;
+    double hScale=1.0;
+    double vScale=1.0;
+    int    lineWidth=6;
+    cvInitFont(&font,CV_FONT_HERSHEY_SIMPLEX|CV_FONT_ITALIC, hScale,vScale,0,lineWidth);
 
     CascadeClassifier face_cascade;
     face_cascade.load("haar_data/haarcascade_frontalface_alt.xml");
-    screen_image = imread("screen_test.png");
 
     VideoCapture cap(0);
     if (!cap.isOpened()) {
@@ -197,8 +225,12 @@ int main() {
         face_cascade.detectMultiScale(gray_image, faces, 1.1, 2, 0|CV_HAAR_SCALE_IMAGE|CV_HAAR_FIND_BIGGEST_OBJECT);
 
         Point left_pupil, right_pupil;
+        Rect left_eye, right_eye;
         if (faces.size() > 0) {
-            find_eyes(frame, faces[0], left_pupil, right_pupil);
+            find_eyes(frame, faces[0], left_pupil, right_pupil, left_eye, right_eye);
+            display_eyes(frame, faces[0], left_pupil, right_pupil, left_eye, right_eye);
+            cout << "Center:" << "(" << faces[0].width/2 << "," << faces[0].height/2 << ")" << "    " << "Rectangle:" << faces[0] << "    " << "Left pupil:" << left_pupil << "   " << "Right pupil:" << right_pupil;
+            cout << "\n";
         }
 
         // if 'q' is tapped, exit
@@ -207,29 +239,45 @@ int main() {
             break;
         }
 
+        EyeSettings.CenterPointOfEyes.x = ((right_eye.x + right_eye.width/2) + (left_eye.x + left_eye.width/2))/2;
+        EyeSettings.CenterPointOfEyes.y = ((right_eye.y + right_eye.height/2) + (left_eye.y + left_eye.height/2))/2;
+
         // if space is tap, take calibration
-        else if(wait_key == 32) {
-            // left screen
-            if (count == 0) {
-                screen.x = (right_pupil.x - left_pupil.x)/2 + left_pupil.x;
-            }
-            // top screen
-            else if (count == 1) {
-                screen.y = (right_pupil.y + left_pupil.y)/2;
-            }
-            // right screen
-            else if (count == 2) {
-                assert (((right_pupil.x - left_pupil.x)/2 + left_pupil.x) > screen.x);
-                screen.width = ((right_pupil.x - left_pupil.x)/2 + left_pupil.x) - screen.x;
-            }
-            // bottom screen
-            else if (count == 3) {
-                assert (((right_pupil.y + left_pupil.y)/2) > screen.y);
-                screen.height = ((right_pupil.y + left_pupil.y)/2) - screen.y;
-                calibration_done = true;
-            }
-            count++;
+        if(wait_key == 32)
+        {
+            EyeSettings.NatPupilOffsetFromEyeCenter.x = EyeSettings.CenterPointOfEyes.x - (right_pupil.x + left_pupil.x)/2;
+            EyeSettings.NatPupilOffsetFromEyeCenter.y = EyeSettings.CenterPointOfEyes.y - (right_pupil.y + left_pupil.y)/2;
+
+            cout << "Nat offset " << EyeSettings.NatPupilOffsetFromEyeCenter << endl;
+            imwrite("calibration.png", frame);
         }
+        Point drawEyeCenter = Point(EyeSettings.CenterPointOfEyes.x + faces[0].x, EyeSettings.CenterPointOfEyes.y + faces[0].y);
+        circle(frame, drawEyeCenter, 3, Scalar(0, 0, 255));
+
+        //v for test
+        if(wait_key == 118)
+        {
+            int XCenterPointOfPupils = (right_pupil.x + left_pupil.x)/2;
+            int YCenterPointOfPupils = (right_pupil.y + left_pupil.y)/2;
+            int xdiff = EyeSettings.CenterPointOfEyes.x - XCenterPointOfPupils - EyeSettings.NatPupilOffsetFromEyeCenter.x;
+            int ydiff = EyeSettings.CenterPointOfEyes.y - YCenterPointOfPupils - EyeSettings.NatPupilOffsetFromEyeCenter.y;
+
+            cout << "eye location: " << xdiff << "," << ydiff << endl;
+            circle(frame, Point(
+                           XCenterPointOfPupils+faces[0].x,
+                           YCenterPointOfPupils+faces[0].y),
+                   3, Scalar(0, 255, 0));
+
+            //map pupil to screen point
+            Point screenLocation = TransformPupilPointToScreenPoint(Point(xdiff,ydiff));
+            //cout << "screen location: " << screenLocation.x << "," << screenLocation.y << endl;
+
+            circle(frame, screenLocation, 3, Scalar(0,0,255));
+            imwrite("test.png", frame);
+
+        }
+
+        imshow("window", frame);
 
         cap >> frame;
     }
