@@ -131,7 +131,7 @@ Point find_centers(Mat face_image, Rect eye_region, string window_name) {
  * color_image: image of the whole frame
  * face: dimensions of face in color_image
  */
-void find_eyes(Mat color_image, Rect face, Point &left_pupil_dst, Point &right_pupil_dst) {
+void find_eyes(Mat color_image, Rect face, Point &left_pupil_dst, Point &right_pupil_dst, CvFont font) {
     // image of face
     Mat face_image = color_image(face);
 
@@ -171,11 +171,19 @@ void find_eyes(Mat color_image, Rect face, Point &left_pupil_dst, Point &right_p
     left_pupil_dst = left_pupil;
     right_pupil_dst = right_pupil;
 
+    //add data
+    putText (color_image, "test", cvPoint(20,700), FONT_HERSHEY_SIMPLEX, double(1), Scalar(0,0,0));
     imshow("window", color_image);
 }
 
 
 int main() {
+    //define font
+    CvFont font;
+    double hScale=1.0;
+    double vScale=1.0;
+    int    lineWidth=6;
+    cvInitFont(&font,CV_FONT_HERSHEY_SIMPLEX|CV_FONT_ITALIC, hScale,vScale,0,lineWidth);
 
     CascadeClassifier face_cascade;
     face_cascade.load("haar_data/haarcascade_frontalface_alt_tree.xml");
@@ -198,7 +206,7 @@ int main() {
 
         Point left_pupil, right_pupil;
         if (faces.size() > 0) {
-            find_eyes(frame, faces[0], left_pupil, right_pupil);
+            find_eyes(frame, faces[0], left_pupil, right_pupil, font);
         }
 
         // if 'q' is tapped, exit
