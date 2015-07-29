@@ -178,7 +178,7 @@ void find_eyes(Mat color_image, Rect face, Point &left_pupil_dst, Point &right_p
 int main() {
 
     CascadeClassifier face_cascade;
-    face_cascade.load("haar_data/haarcascade_frontalface_alt.xml");
+    face_cascade.load("haar_data/haarcascade_frontalface_alt_tree.xml");
     screen_image = imread("screen_test.png");
 
     VideoCapture cap(0);
